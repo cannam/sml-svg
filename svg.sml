@@ -50,7 +50,7 @@ structure Svg = struct
              FONT_WEIGHT of int | (* !!! iffy *)
              FONT_SIZE of real (* !!! nope *)
 
-    type 'a adjusted = 'a * property list
+    type 'a decorated = 'a * property list
                                      
     datatype element =
              PATH of path |
@@ -62,9 +62,9 @@ structure Svg = struct
              POLYLINE of coords list |
              POLYGON of coords list |
              TEXT of text |
-             GROUP of element adjusted list
+             GROUP of element decorated list
 
-    type svg = element adjusted list (* !!! + width, height, metadata like title, etc *)
+    type svg = element decorated list (* !!! + width, height, metadata like title, etc *)
                                  
 end
 
@@ -100,14 +100,61 @@ end
 
 structure SvgSerialise = struct
 
-    fun serialiseContent svg = "" (*!!!*)
+    open Svg
+
+    fun propertyName p =
+        case p of
+            STROKE _ => "stroke"
+          | STROKE_WIDTH _ => "stroke-width"
+          | STROKE_LINECAP _ => "stroke-linecap"
+          | STROKE_LINEJOIN _ => "stroke-linejoin"
+          | STROKE_OPACITY _ => "stroke-opacity"
+          | FILL _ => "fill"
+          | FILL_RULE _ => "fill-rule"
+          | FILL_OPACITY _ => "fill-opacity"
+          | OPACITY _ => "opacity"
+          | FONT_FAMILY _ => "font-family"
+          | FONT_STYLE _ => "font-style"
+          | FONT_WEIGHT _ => "font-weight"
+          | FONT_SIZE _ => "font-size"
+
+    fun elementName e =
+        case e of
+            PATH _ => "path"
+          | RECT _ => "rect"
+          | ROUNDED_RECT _ => "rect"
+          | CIRCLE _ => "circle" 
+          | ELLIPSE _ => "ellipse"
+          | LINE _ => "line" 
+          | POLYLINE _ => "polyline"
+          | POLYGON _ => "polygon"
+          | TEXT _ => "text"
+          | GROUP _ => "g"
+
+    fun serialiseProperty prop = ""
+                           
+    fun serialiseProperties props =
+        String.concatWith " " (map serialiseProperty props)
+
+    and serialiseElementWith proptext elt =
+        "<" ^ elementName elt ^ " " ^ proptext ^
+        (case elt of
+             GROUP content => ">" ^ serialiseContent content ^ 
+                              "</" ^ elementName elt ^ ">"
+           | other => "/>")
+
+    and serialiseDecoratedElement (elt, props) =
+        serialiseElementWith (serialiseProperties props) elt
+
+    and serialiseContent svg =
+        String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
 
     fun serialiseDocument svg =
         "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
         "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n" ^
         "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n" ^
         serialiseContent svg ^
-        "</svg>"
+        "</svg>\n"
 
 end
                                  
@@ -127,7 +174,6 @@ val mysvg = [(PATH mypath, [STROKE (RGB (1.0, 1.0, 0.0))]),
                              rotation = 0.0,
                              text = "Help me!" }, [FONT_FAMILY ["Helvetica"]])],
               [])]
-
                              
-fun main () = ()
+fun main () = print (SvgSerialise.serialiseDocument mysvg)
                   
