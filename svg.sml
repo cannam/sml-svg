@@ -30,8 +30,8 @@ structure Svg = struct
              COLOUR of string |
              RGB of real * real * real
                                       
-    datatype linecap = BUTT | ROUND | SQUARE
-    datatype linejoin = MITRE | ROUND | BEVEL
+    datatype linecap = BUTT | ROUND_CAP | SQUARE
+    datatype linejoin = MITRE | ROUND_JOIN | BEVEL
     datatype fontstyle = NORMAL | ITALIC | OBLIQUE
     datatype fillrule = NON_ZERO | EVEN_ODD
 
@@ -102,6 +102,19 @@ structure SvgSerialise = struct
 
     open Svg
 
+    fun elementName e =
+        case e of
+            PATH _ => "path"
+          | RECT _ => "rect"
+          | ROUNDED_RECT _ => "rect"
+          | CIRCLE _ => "circle" 
+          | ELLIPSE _ => "ellipse"
+          | LINE _ => "line" 
+          | POLYLINE _ => "polyline"
+          | POLYGON _ => "polygon"
+          | TEXT _ => "text"
+          | GROUP _ => "g"
+
     fun propertyName p =
         case p of
             STROKE _ => "stroke"
@@ -118,21 +131,48 @@ structure SvgSerialise = struct
           | FONT_WEIGHT _ => "font-weight"
           | FONT_SIZE _ => "font-size"
 
-    fun elementName e =
-        case e of
-            PATH _ => "path"
-          | RECT _ => "rect"
-          | ROUNDED_RECT _ => "rect"
-          | CIRCLE _ => "circle" 
-          | ELLIPSE _ => "ellipse"
-          | LINE _ => "line" 
-          | POLYLINE _ => "polyline"
-          | POLYGON _ => "polygon"
-          | TEXT _ => "text"
-          | GROUP _ => "g"
+    fun paintString NO_PAINT = "no-paint"
+      | paintString (COLOUR str) = str
+      | paintString (RGB (r, g, b)) =
+        "rgb(" ^ String.concatWith "," (map (fn x => Int.toString
+                                                         (Real.round
+                                                              (x * 255.0)))
+                                            [r, g, b]) ^ ")"
+                               
+    fun lineCapName BUTT = "butt"
+      | lineCapName ROUND_CAP = "round"
+      | lineCapName SQUARE = "square"
 
-    fun serialiseProperty prop = ""
-                           
+    fun lineJoinName MITRE = "miter"
+      | lineJoinName ROUND_JOIN = "round"
+      | lineJoinName BEVEL = "bevel"
+
+    fun fontStyleName NORMAL = "normal"
+      | fontStyleName ITALIC = "italic"
+      | fontStyleName OBLIQUE = "oblique"
+
+    fun fillRuleName NON_ZERO = "non-zero"
+      | fillRuleName EVEN_ODD = "even-odd"
+                                    
+    fun propertyValueString p =
+        case p of
+            STROKE x => paintString x
+          | STROKE_WIDTH x => Real.toString x
+          | STROKE_LINECAP x => lineCapName x
+          | STROKE_LINEJOIN x => lineJoinName x
+          | STROKE_OPACITY x => Real.toString x
+          | FILL x => paintString x
+          | FILL_RULE x => fillRuleName x
+          | FILL_OPACITY x => Real.toString x
+          | OPACITY x => Real.toString x
+          | FONT_FAMILY x => String.concatWith ", " x
+          | FONT_STYLE x => fontStyleName x
+          | FONT_WEIGHT x => Int.toString x
+          | FONT_SIZE x => Real.toString x
+
+    fun serialiseProperty prop =
+        propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""
+        
     fun serialiseProperties props =
         String.concatWith " " (map serialiseProperty props)
 
