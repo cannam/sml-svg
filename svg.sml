@@ -23,15 +23,6 @@ datatype path_element =
 
 type path = path_element list
 
-datatype shape =
-         RECT of { origin: coords, size: dimens } |
-         ROUNDED_RECT of { origin: coords, size: dimens, radii: dimens } |
-         CIRCLE of { centre: coords, radius: real } |
-         ELLIPSE of { centre: coords, radii: dimens } |
-         LINE of { source: coords, target: coords } |
-         POLYLINE of coords list |
-         POLYGON of coords list
-
 type text = { origin: coords, rotation: real, text: string }
 
 datatype paint =
@@ -59,7 +50,13 @@ type 'a decorated = 'a * property list
                           
 datatype element =
          PATH of path |
-         SHAPE of shape |
+         RECT of { origin: coords, size: dimens } |
+         ROUNDED_RECT of { origin: coords, size: dimens, radii: dimens } |
+         CIRCLE of { centre: coords, radius: real } |
+         ELLIPSE of { centre: coords, radii: dimens } |
+         LINE of { source: coords, target: coords } |
+         POLYLINE of coords list |
+         POLYGON of coords list |
          TEXT of text |
          GROUP of element decorated list
 
@@ -125,7 +122,7 @@ val mypath = [ M (1.0, 2.0),
 val mysvg = [(PATH mypath, [PEN (1.0, 1.0, 0.0)]),
              (GROUP [(PATH [M (3.0, 4.0),
                             L [(0.0, 0.0)]], []),
-                     (SHAPE (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)]), [PEN (0.0, 0.0, 1.0)]),
+                     (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)], [PEN (0.0, 0.0, 1.0)]),
                      (TEXT { origin = (0.0, 0.0),
                              rotation = 0.0,
                              text = "Help me!" }, [FONT_FAMILY ["Helvetica"]])],
