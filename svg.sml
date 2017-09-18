@@ -115,6 +115,27 @@ structure SvgSerialise = struct
           | TEXT _ => "text"
           | GROUP _ => "g"
 
+    fun realString r =
+        implode (map (fn #"~" => #"-" | c => c) (explode (Real.toString r)))
+
+    fun joinMap j f xs = String.concatWith j (map f xs)
+                
+    fun coordString (x, y) =
+        realString x ^ "," ^ realString y
+                           
+    fun pathElementText pe =
+        case pe of
+            MOVE_TO (ABS c) => "M " ^ coordString c
+          | MOVE_TO (REL c) => "m " ^ coordString c
+          | LINE_TO (ABS cc) => "L " ^ joinMap " " (fn c => "L " ^ coordString c) cc
+                           
+    fun elementAttributes e =
+        case e of
+            PATH pp => "d=\"" ^
+                       String.concatWith " " (map pathElementText pp) ^
+                       "\""
+          | _ => "" (*!!! *)
+                           
     fun propertyName p =
         case p of
             STROKE _ => "stroke"
@@ -131,28 +152,41 @@ structure SvgSerialise = struct
           | FONT_WEIGHT _ => "font-weight"
           | FONT_SIZE _ => "font-size"
 
-    fun paintString NO_PAINT = "no-paint"
-      | paintString (COLOUR str) = str
-      | paintString (RGB (r, g, b)) =
-        "rgb(" ^ String.concatWith "," (map (fn x => Int.toString
-                                                         (Real.round
-                                                              (x * 255.0)))
-                                            [r, g, b]) ^ ")"
+    fun rgbString (r, g, b) =
+        "rgb(" ^
+        String.concatWith ","
+                          (map (fn x => Int.toString (Real.round (x * 255.0)))
+                               [r, g, b]) ^
+        ")"
                                
-    fun lineCapName BUTT = "butt"
-      | lineCapName ROUND_CAP = "round"
-      | lineCapName SQUARE = "square"
+    fun paintString p =
+        case p of
+            NO_PAINT => "no-paint"
+          | COLOUR str => str
+          | RGB rgb => rgbString rgb
+                               
+    fun lineCapName c =
+        case c of
+            BUTT => "butt"
+          | ROUND_CAP => "round"
+          | SQUARE => "square"
 
-    fun lineJoinName MITRE = "miter"
-      | lineJoinName ROUND_JOIN = "round"
-      | lineJoinName BEVEL = "bevel"
+    fun lineJoinName j =
+        case j of
+            MITRE => "miter"
+          | ROUND_JOIN => "round"
+          | BEVEL => "bevel"
 
-    fun fontStyleName NORMAL = "normal"
-      | fontStyleName ITALIC = "italic"
-      | fontStyleName OBLIQUE = "oblique"
+    fun fontStyleName f =
+        case f of
+            NORMAL => "normal"
+          | ITALIC => "italic"
+          | OBLIQUE => "oblique"
 
-    fun fillRuleName NON_ZERO = "non-zero"
-      | fillRuleName EVEN_ODD = "even-odd"
+    fun fillRuleName r =
+        case r of
+            NON_ZERO => "non-zero"
+          | EVEN_ODD => "even-odd"
                                     
     fun propertyValueString p =
         case p of
@@ -172,12 +206,13 @@ structure SvgSerialise = struct
 
     fun serialiseProperty prop =
         propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""
-        
-    fun serialiseProperties props =
-        String.concatWith " " (map serialiseProperty props)
+
+    fun serialiseProperties [] = ""
+      | serialiseProperties props =
+        " " ^ String.concatWith " " (map serialiseProperty props)
 
     and serialiseElementWith proptext elt =
-        "<" ^ elementName elt ^ " " ^ proptext ^
+        "<" ^ elementName elt ^ elementAttributes elt ^ proptext ^
         (case elt of
              GROUP content => ">" ^ serialiseContent content ^ 
                               "</" ^ elementName elt ^ ">"
