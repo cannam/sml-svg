@@ -132,6 +132,10 @@ structure SvgSerialise = struct
           | MOVE_TO (REL c) => "m " ^ coordString c
           | LINE_TO (ABS cc) => joinMap " " (fn c => "L " ^ coordString c) cc
           | LINE_TO (REL cc) => joinMap " " (fn c => "l " ^ coordString c) cc
+          | HORIZONTAL_TO (ABS x) => "H " ^ realString x
+          | HORIZONTAL_TO (REL x) => "h " ^ realString x
+          | VERTICAL_TO (ABS y) => "V " ^ realString y
+          | VERTICAL_TO (REL y) => "v " ^ realString y
           | CLOSE_PATH => "Z"
           | other => "" (*!!!*)
                            
@@ -142,6 +146,10 @@ structure SvgSerialise = struct
           | TEXT { origin, rotation, text } =>
             " " ^ coordAttrString origin ^
             " rotate=\"" ^ realString rotation ^ "\""
+          | POLYLINE cc =>
+            " points=\"" ^ joinMap " " coordString cc ^ "\""
+          | POLYGON cc =>
+            " points=\"" ^ joinMap " " coordString cc ^ "\""
           | _ => "" (*!!! *)
                            
     fun propertyName p =
@@ -167,7 +175,7 @@ structure SvgSerialise = struct
                                
     fun paintString p =
         case p of
-            NO_PAINT => "no-paint"
+            NO_PAINT => "none"
           | COLOUR str => str
           | RGB rgb => rgbString rgb
                                
@@ -253,10 +261,12 @@ val mysvg = {
     size = (10.0, 5.0),
     content = [
         (PATH mypath, [STROKE (RGB (1.0, 0.0, 0.0)),
-                       STROKE_WIDTH 0.2]),
-        (GROUP [(PATH [M (3.0, 4.0),
-                       L [(0.0, 0.0)]], [STROKE (RGB (0.0, 0.0, 1.0))]),
-                (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)], [STROKE (RGB (0.0, 0.0, 1.0))]),
+                       STROKE_WIDTH 0.2,
+        FILL (COLOUR "darkslategray")]),
+        (GROUP [(PATH [M (3.0, 4.0), H 0.0, L [(0.0, 0.0)]],
+                 [STROKE (RGB (0.0, 0.0, 1.0)), FILL NO_PAINT]),
+                (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)],
+                 [STROKE (RGB (0.0, 1.0, 0.0)), STROKE_WIDTH 0.1, FILL NO_PAINT]),
                 (TEXT { origin = (0.0, 5.0),
                         rotation = 0.0,
                         text = "Help me!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
