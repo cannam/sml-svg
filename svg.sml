@@ -125,7 +125,16 @@ structure SvgSerialise = struct
 
     fun coordAttrString (x, y) =
         "x=\"" ^ realString x ^ "\" y=\"" ^ realString y ^ "\""
-                                        
+
+    fun dimenAttrString (x, y) =
+        "width=\"" ^ realString x ^ "\" height=\"" ^ realString y ^ "\""
+
+    fun escapeTextData str =
+        String.translate (fn #"<" => "&lt;"
+                           | #">" => "&gt;"
+                           | #"&" => "&amp;"
+                           | c => Char.toString c) str
+                                                                        
     fun pathElementText pe =
         case pe of
             MOVE_TO (ABS c) => "M " ^ coordString c
@@ -141,15 +150,14 @@ structure SvgSerialise = struct
                            
     fun elementAttributes e =
         case e of
-            PATH pp =>
-            " d=\"" ^ joinMap " " pathElementText pp ^ "\""
-          | TEXT { origin, rotation, text } =>
-            " " ^ coordAttrString origin ^
-            " rotate=\"" ^ realString rotation ^ "\""
-          | POLYLINE cc =>
-            " points=\"" ^ joinMap " " coordString cc ^ "\""
-          | POLYGON cc =>
-            " points=\"" ^ joinMap " " coordString cc ^ "\""
+            PATH pp => " d=\"" ^ joinMap " " pathElementText pp ^ "\""
+          | RECT { origin, size } => " " ^ coordAttrString origin ^
+                                     " " ^ dimenAttrString size
+          | TEXT { origin, rotation, text } => " " ^ coordAttrString origin ^
+                                               " rotate=\"" ^
+                                               realString rotation ^ "\""
+          | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
+          | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | _ => "" (*!!! *)
                            
     fun propertyName p =
@@ -231,7 +239,7 @@ structure SvgSerialise = struct
              GROUP content =>
              ">" ^ serialiseContent content ^ "</" ^ elementName elt ^ ">"
            | TEXT { text, ... } =>
-             ">" ^ text ^ "</" ^ elementName elt ^ ">" (*!!! escape text, handle common close-element logic *)
+             ">" ^ escapeTextData text ^ "</" ^ elementName elt ^ ">" (*!!! handle common close-element logic *)
            | other => "/>")
 
     and serialiseDecoratedElement (elt, props) =
@@ -240,10 +248,10 @@ structure SvgSerialise = struct
     and serialiseContent svg =
         String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
 
-    fun serialiseDocument ({ size = (width, height), content } : svg) =
+    fun serialiseDocument ({ size, content } : svg) =
         "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
         "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n" ^
-        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"" ^ realString width ^ "\" height=\"" ^ realString height ^ "\">\n" ^
+        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrString size ^ ">\n" ^
         serialiseContent content ^
         "</svg>\n"
 
@@ -262,14 +270,18 @@ val mysvg = {
     content = [
         (PATH mypath, [STROKE (RGB (1.0, 0.0, 0.0)),
                        STROKE_WIDTH 0.2,
-        FILL (COLOUR "darkslategray")]),
+                       FILL (COLOUR "darkslategray")]),
+        (RECT { origin = (4.0, 4.0), size = (2.0, 1.0) },
+         [ STROKE_WIDTH 0.1,
+           STROKE (COLOUR "pink"),
+           FILL (COLOUR "purple") ]),
         (GROUP [(PATH [M (3.0, 4.0), H 0.0, L [(0.0, 0.0)]],
                  [STROKE (RGB (0.0, 0.0, 1.0)), FILL NO_PAINT]),
                 (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)],
                  [STROKE (RGB (0.0, 1.0, 0.0)), STROKE_WIDTH 0.1, FILL NO_PAINT]),
                 (TEXT { origin = (0.0, 5.0),
                         rotation = 0.0,
-                        text = "Help me!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
+                        text = "<Help/> me!&@!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
          [])
     ]}
                   
