@@ -64,7 +64,7 @@ structure Svg = struct
              TEXT of text |
              GROUP of element decorated list
 
-    type svg = element decorated list (* !!! + width, height, metadata like title, etc *)
+    type svg = { size: dimens, content: element decorated list } (* !!! + metadata like title, etc *)
                                  
 end
 
@@ -122,18 +122,26 @@ structure SvgSerialise = struct
                 
     fun coordString (x, y) =
         realString x ^ "," ^ realString y
-                           
+
+    fun coordAttrString (x, y) =
+        "x=\"" ^ realString x ^ "\" y=\"" ^ realString y ^ "\""
+                                        
     fun pathElementText pe =
         case pe of
             MOVE_TO (ABS c) => "M " ^ coordString c
           | MOVE_TO (REL c) => "m " ^ coordString c
-          | LINE_TO (ABS cc) => "L " ^ joinMap " " (fn c => "L " ^ coordString c) cc
+          | LINE_TO (ABS cc) => joinMap " " (fn c => "L " ^ coordString c) cc
+          | LINE_TO (REL cc) => joinMap " " (fn c => "l " ^ coordString c) cc
+          | CLOSE_PATH => "Z"
+          | other => "" (*!!!*)
                            
     fun elementAttributes e =
         case e of
-            PATH pp => "d=\"" ^
-                       String.concatWith " " (map pathElementText pp) ^
-                       "\""
+            PATH pp =>
+            " d=\"" ^ joinMap " " pathElementText pp ^ "\""
+          | TEXT { origin, rotation, text } =>
+            " " ^ coordAttrString origin ^
+            " rotate=\"" ^ realString rotation ^ "\""
           | _ => "" (*!!! *)
                            
     fun propertyName p =
@@ -154,9 +162,7 @@ structure SvgSerialise = struct
 
     fun rgbString (r, g, b) =
         "rgb(" ^
-        String.concatWith ","
-                          (map (fn x => Int.toString (Real.round (x * 255.0)))
-                               [r, g, b]) ^
+        joinMap "," (fn x => Int.toString (Real.round (x * 255.0))) [r, g, b] ^
         ")"
                                
     fun paintString p =
@@ -214,8 +220,10 @@ structure SvgSerialise = struct
     and serialiseElementWith proptext elt =
         "<" ^ elementName elt ^ elementAttributes elt ^ proptext ^
         (case elt of
-             GROUP content => ">" ^ serialiseContent content ^ 
-                              "</" ^ elementName elt ^ ">"
+             GROUP content =>
+             ">" ^ serialiseContent content ^ "</" ^ elementName elt ^ ">"
+           | TEXT { text, ... } =>
+             ">" ^ text ^ "</" ^ elementName elt ^ ">" (*!!! escape text, handle common close-element logic *)
            | other => "/>")
 
     and serialiseDecoratedElement (elt, props) =
@@ -224,11 +232,11 @@ structure SvgSerialise = struct
     and serialiseContent svg =
         String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
 
-    fun serialiseDocument svg =
+    fun serialiseDocument ({ size = (width, height), content } : svg) =
         "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
         "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n" ^
-        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n" ^
-        serialiseContent svg ^
+        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"" ^ realString width ^ "\" height=\"" ^ realString height ^ "\">\n" ^
+        serialiseContent content ^
         "</svg>\n"
 
 end
@@ -241,14 +249,19 @@ val mypath = [ M (1.0, 2.0),
                Z
              ]
 
-val mysvg = [(PATH mypath, [STROKE (RGB (1.0, 1.0, 0.0))]),
-             (GROUP [(PATH [M (3.0, 4.0),
-                            L [(0.0, 0.0)]], []),
-                     (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)], [STROKE (RGB (0.0, 0.0, 1.0))]),
-                     (TEXT { origin = (0.0, 0.0),
-                             rotation = 0.0,
-                             text = "Help me!" }, [FONT_FAMILY ["Helvetica"]])],
-              [])]
-                             
+val mysvg = {
+    size = (10.0, 5.0),
+    content = [
+        (PATH mypath, [STROKE (RGB (1.0, 0.0, 0.0)),
+                       STROKE_WIDTH 0.2]),
+        (GROUP [(PATH [M (3.0, 4.0),
+                       L [(0.0, 0.0)]], [STROKE (RGB (0.0, 0.0, 1.0))]),
+                (POLYLINE [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)], [STROKE (RGB (0.0, 0.0, 1.0))]),
+                (TEXT { origin = (0.0, 5.0),
+                        rotation = 0.0,
+                        text = "Help me!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
+         [])
+    ]}
+                  
 fun main () = print (SvgSerialise.serialiseDocument mysvg)
                   
