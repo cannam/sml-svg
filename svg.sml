@@ -64,7 +64,9 @@ structure Svg = struct
              TEXT of text |
              GROUP of element decorated list
 
-    type svg = { size: dimens, content: element decorated list } (* !!! + metadata like title, etc *)
+    type content = element decorated list
+                              
+    type svg = { size: dimens, content: content } (* !!! + metadata like title, etc *)
                                  
 end
 
@@ -98,7 +100,12 @@ structure SvgPathShorthand = struct
 
 end
 
-structure SvgSerialise = struct
+structure SvgSerialise :> sig
+
+    val serialiseContent : Svg.content -> string
+    val serialiseDocument : Svg.svg -> string
+                                                     
+end = struct
 
     open Svg
 

@@ -26,5 +26,16 @@ val mysvg = {
                         text = "<Help/> me!&@!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
          [])
     ]}
-                  
-fun main () = print (SvgSerialise.serialiseDocument mysvg)
+
+fun sinusoid (nsamples, samplerate, { frequency, phase }) =
+    Vector.tabulate (nsamples,
+                     fn i =>
+                        let val x = Real.fromInt i
+                        in
+                            Math.sin (phase + (x * 2.0 * Math.pi * frequency /
+                                               samplerate))
+                        end)
+
+val wave = sinusoid (2000, 1000.0, { frequency = 50.0, phase = 0.0 })
+                    
+fun main () = print (SvgSerialise.serialiseDocument (PlotTimeseries.plot wave))
