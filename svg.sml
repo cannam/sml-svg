@@ -57,7 +57,7 @@ structure Svg = struct
              FONT_STYLE of fontstyle |
              FONT_WEIGHT of int | (* !!! iffy *)
              FONT_SIZE of real | (* !!! nope *)
-             TRANSFORM of transform
+             TRANSFORM of transform list
 
     type 'a decorated = 'a * property list
                                       
@@ -266,7 +266,7 @@ end = struct
           | FONT_STYLE x => fontStyleName x
           | FONT_WEIGHT x => Int.toString x
           | FONT_SIZE x => realString x
-          | TRANSFORM t => transformString t
+          | TRANSFORM tt => String.concatWith " " (map transformString tt)
 
     fun serialiseProperty prop =
         propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""

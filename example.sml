@@ -24,7 +24,7 @@ val mysvg = {
                 (TEXT { origin = (0.0, 5.0),
                         rotation = 0.0,
                         text = "<Help/> me!&@!" }, [FONT_FAMILY ["Helvetica"], FONT_SIZE 2.0])],
-         [TRANSFORM (ROTATE 45.0)])
+         [TRANSFORM [ROTATE 45.0]])
     ]}
 
 fun sinusoid (nsamples, samplerate, { frequency, phase }) =
@@ -38,11 +38,12 @@ fun sinusoid (nsamples, samplerate, { frequency, phase }) =
 
 val wave = sinusoid (2000, 1000.0, { frequency = 50.0, phase = 0.0 })
 
-                    (*                    
-fun main () = print (SvgSerialise.serialiseDocument (PlotTimeseries.plot wave))
 
-                    *)
+fun main () = print (SvgSerialise.serialiseDocument
+                         (PlotTimeseries.plot (10000.0, 150.0) wave))
 
+(*
 fun main () =
     print (SvgSerialise.serialiseDocument mysvg)
           
+                    *)
