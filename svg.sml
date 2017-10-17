@@ -35,6 +35,14 @@ structure Svg = struct
     datatype fontstyle = NORMAL | ITALIC | OBLIQUE
     datatype fillrule = NON_ZERO | EVEN_ODD
 
+    datatype transform =
+             MATRIX of real * real * real * real * real * real |
+             TRANSLATE of coords |
+             SCALE of dimens |
+             ROTATE of real |
+             SKEW_X of real |
+             SKEW_Y of real
+
     datatype property =
              STROKE of paint |
              STROKE_WIDTH of real |
@@ -48,10 +56,11 @@ structure Svg = struct
              FONT_FAMILY of string list |
              FONT_STYLE of fontstyle |
              FONT_WEIGHT of int | (* !!! iffy *)
-             FONT_SIZE of real (* !!! nope *)
+             FONT_SIZE of real | (* !!! nope *)
+             TRANSFORM of transform
 
     type 'a decorated = 'a * property list
-                                     
+                                      
     datatype element =
              PATH of path |
              RECT of { origin: coords, size: dimens } |
@@ -182,7 +191,32 @@ end = struct
           | FONT_STYLE _ => "font-style"
           | FONT_WEIGHT _ => "font-weight"
           | FONT_SIZE _ => "font-size"
+          | TRANSFORM _ => "transform"
 
+    fun transformName t =
+        case t of
+            MATRIX _ => "matrix"
+          | TRANSLATE _ => "translate"
+          | SCALE _ => "scale"
+          | ROTATE _ => "rotate"
+          | SKEW_X _ => "skewX"
+          | SKEW_Y _ => "skewY"
+
+    fun transformArgString t =
+        String.concatWith
+            ","
+            (map realString
+                 (case t of
+                      MATRIX (a,b,c,d,e,f) => [a,b,c,d,e,f]
+                    | TRANSLATE (x,y) => [x,y]
+                    | SCALE (sx,sy) => [sx,sy]
+                    | ROTATE r => [r]
+                    | SKEW_X s => [s]
+                    | SKEW_Y s => [s]))
+                            
+    fun transformString t =
+        transformName t ^ "(" ^ transformArgString t ^ ")"
+                            
     fun rgbString (r, g, b) =
         "rgb(" ^
         joinMap "," (fn x => Int.toString (Real.round (x * 255.0))) [r, g, b] ^
@@ -220,18 +254,19 @@ end = struct
     fun propertyValueString p =
         case p of
             STROKE x => paintString x
-          | STROKE_WIDTH x => Real.toString x
+          | STROKE_WIDTH x => realString x
           | STROKE_LINECAP x => lineCapName x
           | STROKE_LINEJOIN x => lineJoinName x
-          | STROKE_OPACITY x => Real.toString x
+          | STROKE_OPACITY x => realString x
           | FILL x => paintString x
           | FILL_RULE x => fillRuleName x
-          | FILL_OPACITY x => Real.toString x
-          | OPACITY x => Real.toString x
+          | FILL_OPACITY x => realString x
+          | OPACITY x => realString x
           | FONT_FAMILY x => String.concatWith ", " x
           | FONT_STYLE x => fontStyleName x
           | FONT_WEIGHT x => Int.toString x
-          | FONT_SIZE x => Real.toString x
+          | FONT_SIZE x => realString x
+          | TRANSFORM t => transformString t
 
     fun serialiseProperty prop =
         propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""
