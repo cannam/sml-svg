@@ -1,48 +1,52 @@
 
 structure PlotTimeseries :> sig
-    val plot : real vector -> Svg.svg
+    val plot : Svg.dimens -> real vector -> Svg.svg
 end = struct
 
-    type state = {
-        n : int,
-        min : real option,
-        max : real option,
-        points : Svg.coords list
-    }
+    fun extents (series : real vector) =
+        Vector.foldl
+            (fn (v, ee) =>
+                case ee of
+                    NONE => SOME (v, v)
+                  | SOME (min, max) =>
+                    SOME (if v < min then v else min,
+                          if v > max then v else max))
+            NONE
+            series
 
-    fun build (v, { n, min, max, points } : state) =
-        let val point = (Real.fromInt n, v)
-            val min = SOME (case min of NONE => v
-                                      | SOME min => if v < min then v else min)
-            val max = SOME (case max of NONE => v
-                                      | SOME max => if v > max then v else max)
-        in
-            { n = n + 1, min = min, max = max, points = point :: points }
-        end
-
-    fun plot series =
-        let val { n, min, max, points } = 
-                Vector.foldl build
-                             { n = 0, min = NONE, max = NONE, points = [] }
-                             series
-            open Svg
-            open SvgPathShorthand
-        in
-            case points of
-                [] => { size = (0.0, 0.0), content = [] }
-              | first::rest =>
-                {
-                  size = (Real.fromInt n,
-                          case (max, min) of
-                              (SOME max, SOME min) => max - min
-                            | _ => 0.0),
-                  content = [
-                      (PATH [M first, L rest],
-                       [STROKE (RGB (1.0, 0.0, 0.0)),
-                        STROKE_WIDTH 0.1,
-                        FILL NO_PAINT])
-                  ]
-                }
+    fun nothing size =
+        { size = size, content = [] }
+            
+    fun plot (width, height) series =
+        case extents series of
+            NONE => nothing (width, height)
+          | SOME (min, max) =>
+            let val xscale = width / Real.fromInt (Vector.length series)
+                val yscale = if Real.== (min, max) then 1.0
+                             else height / (max - min)
+                val (i, points) =
+                    Vector.foldl
+                        (fn (v, (i, points)) =>
+                            (i + 1,
+                             (xscale * Real.fromInt i,
+                              yscale * (v - min)) :: points))
+                        (0, [])
+                        series
+                val points = rev points
+                open Svg
+                open SvgPathShorthand
+            in
+                case points of
+                    [] => nothing (width, height)
+                  | first::rest =>
+                    { size = (width, height),
+                      content = [
+                          (PATH [M first, L rest],
+                           [STROKE (RGB (1.0, 0.0, 0.0)),
+                            STROKE_WIDTH 1.0,
+                            FILL NO_PAINT])
+                      ]
+                    }
         end
 end
           
