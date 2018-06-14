@@ -36,11 +36,11 @@ fun sinusoid (nsamples, samplerate, { frequency, phase }) =
                                                samplerate))
                         end)
 
-val wave = sinusoid (2000, 1000.0, { frequency = 50.0, phase = 0.0 })
+val wave = sinusoid (200, 1000.0, { frequency = 50.0, phase = Math.pi/2.0 })
 
 
 fun main () = print (SvgSerialise.serialiseDocument
-                         (PlotTimeseries.plot (10000.0, 150.0) wave))
+                         (PlotTimeseries.plot (1000.0, 150.0) wave))
 
 (*
 fun main () =

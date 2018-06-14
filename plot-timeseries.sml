@@ -41,9 +41,12 @@ end = struct
                   | first::rest =>
                     { size = (width, height),
                       content = [
-                          (PATH [M first, L rest],
-                           [STROKE (RGB (1.0, 0.0, 0.0)),
-                            STROKE_WIDTH 1.0,
+                          (GROUP 
+                               [(PATH [M first, L rest],
+                                 [STROKE (RGB (1.0, 0.0, 0.0)),
+                                  STROKE_WIDTH 1.0])],
+                           [TRANSFORM
+                                [MATRIX (1.0, 0.0, 0.0, ~1.0, 0.0, height)],
                             FILL NO_PAINT])
                       ]
                     }
