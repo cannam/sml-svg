@@ -2,3 +2,4 @@ syntax: glob
 *.deps
 *~
 a.out
+glob:.repoint-*.bin
