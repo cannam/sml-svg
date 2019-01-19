@@ -109,6 +109,68 @@ structure SvgPathShorthand = struct
 
 end
 
+structure SvgPathShorthandInt = struct
+
+local
+    val toReal = Real.fromInt
+    fun toReals (x, y) = (toReal x, toReal y)
+
+    fun cubicToReals { control1, control2, target } =
+        { control1 = toReals control1,
+          control2 = toReals control2,
+          target = toReals target }
+
+    fun cubicSmoothToReals { control2, target } =
+        { control2 = toReals control2,
+          target = toReals target }
+
+    fun quadraticToReals { control, target } =
+        { control = toReals control,
+          target = toReals target }
+
+    fun quadraticSmoothToReals { target } =
+        { target = toReals target }
+
+    fun arcToReals { radii, rotation, largeArc, sweep, target } =
+        { radii = toReals radii,
+          rotation = rotation,
+          largeArc = largeArc,
+          sweep = sweep,
+          target = toReals target }
+            
+    structure S = SvgPathShorthand
+in
+
+    val M = S.M o toReals
+    val m = S.m o toReals
+
+    val L = S.L o (map toReals)
+    val l = S.l o (map toReals)
+
+    val H = S.H o toReal
+    val h = S.h o toReal
+    val V = S.V o toReal
+    val v = S.v o toReal
+
+    val C = S.C o (map cubicToReals)
+    val c = S.c o (map cubicToReals)
+    val S = S.S o (map cubicSmoothToReals)
+    val s = S.s o (map cubicSmoothToReals)
+
+    val Q = S.Q o (map quadraticToReals)
+    val q = S.q o (map quadraticToReals)
+    val T = S.T o (map quadraticSmoothToReals)
+    val t = S.t o (map quadraticSmoothToReals)
+
+    val A = S.A o (map arcToReals)
+    val a = S.a o (map arcToReals)
+
+    val Z = S.Z
+    val z = S.z
+                
+end
+end
+
 structure SvgSerialise :> sig
 
     val serialiseContent : Svg.content -> string
@@ -145,6 +207,18 @@ end = struct
     fun dimenAttrString (x, y) =
         "width=\"" ^ realString x ^ "\" height=\"" ^ realString y ^ "\""
 
+    fun cubicString { control1 = (x1, y1),
+                      control2 = (x2, y2),
+                      target = (x, y) } =
+        realString x1 ^ " " ^ realString y1 ^ "," ^
+        realString x2 ^ " " ^ realString y2 ^ "," ^
+        realString x ^ " " ^ realString y
+
+    fun quadraticString { control = (x1, y1),
+                          target = (x, y) } =
+        realString x1 ^ " " ^ realString y1 ^ "," ^
+        realString x ^ " " ^ realString y
+                                                                        
     fun escapeTextData str =
         String.translate (fn #"<" => "&lt;"
                            | #">" => "&gt;"
@@ -161,6 +235,10 @@ end = struct
           | HORIZONTAL_TO (REL x) => "h " ^ realString x
           | VERTICAL_TO (ABS y) => "V " ^ realString y
           | VERTICAL_TO (REL y) => "v " ^ realString y
+          | CUBIC_TO (ABS pp) => joinMap " " (fn p => "C " ^ cubicString p) pp
+          | CUBIC_TO (REL pp) => joinMap " " (fn p => "c " ^ cubicString p) pp
+          | QUADRATIC_TO (ABS pp) => joinMap " " (fn p => "Q " ^ quadraticString p) pp
+          | QUADRATIC_TO (REL pp) => joinMap " " (fn p => "q " ^ quadraticString p) pp
           | CLOSE_PATH => "Z"
           | other => "" (*!!!*)
                            
