@@ -48,6 +48,7 @@ structure Svg = struct
              STROKE_WIDTH of real |
              STROKE_LINECAP of linecap |
              STROKE_LINEJOIN of linejoin |
+             STROKE_DASHARRAY of real list |
              STROKE_OPACITY of real |
              FILL of paint |
              FILL_RULE of fillrule |
@@ -260,6 +261,7 @@ end = struct
           | STROKE_WIDTH _ => "stroke-width"
           | STROKE_LINECAP _ => "stroke-linecap"
           | STROKE_LINEJOIN _ => "stroke-linejoin"
+          | STROKE_DASHARRAY _ => "stroke-dasharray"
           | STROKE_OPACITY _ => "stroke-opacity"
           | FILL _ => "fill"
           | FILL_RULE _ => "fill-rule"
@@ -335,6 +337,7 @@ end = struct
           | STROKE_WIDTH x => realString x
           | STROKE_LINECAP x => lineCapName x
           | STROKE_LINEJOIN x => lineJoinName x
+          | STROKE_DASHARRAY x => String.concatWith "," (map realString x)
           | STROKE_OPACITY x => realString x
           | FILL x => paintString x
           | FILL_RULE x => fillRuleName x
