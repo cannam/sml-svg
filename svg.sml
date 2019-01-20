@@ -195,7 +195,11 @@ end = struct
           | GROUP _ => "g"
 
     fun realString r =
-        implode (map (fn #"~" => #"-" | c => c) (explode (Real.toString r)))
+        implode
+            (case rev (map (fn #"~" => #"-" | c => c)
+                           (explode (Real.toString r))) of
+                 (#"0")::(#".")::s => rev s
+               | s => rev s)
 
     fun joinMap j f xs = String.concatWith j (map f xs)
 
