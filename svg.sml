@@ -198,6 +198,9 @@ end = struct
         implode (map (fn #"~" => #"-" | c => c) (explode (Real.toString r)))
 
     fun joinMap j f xs = String.concatWith j (map f xs)
+
+    fun joinMapElement code f [] = ""
+      | joinMapElement code f xs = code ^ " " ^ joinMap " " f xs
                 
     fun coordString (x, y) =
         realString x ^ "," ^ realString y
@@ -220,9 +223,9 @@ end = struct
         realString x1 ^ " " ^ realString y1 ^ "," ^
         realString x ^ " " ^ realString y
 
-    fun arcToString { radii = (rx, ry),
-                      rotation, largeArc, sweep,
-                      target = (x, y) } =
+    fun arcString { radii = (rx, ry),
+                    rotation, largeArc, sweep,
+                    target = (x, y) } =
         realString rx ^ "," ^ realString ry ^ " " ^
         realString rotation ^ " " ^
         (if largeArc then "1 " else "0 ") ^
@@ -239,18 +242,18 @@ end = struct
         case pe of
             MOVE_TO (ABS c) => "M " ^ coordString c
           | MOVE_TO (REL c) => "m " ^ coordString c
-          | LINE_TO (ABS cc) => joinMap " " (fn c => "L " ^ coordString c) cc
-          | LINE_TO (REL cc) => joinMap " " (fn c => "l " ^ coordString c) cc
+          | LINE_TO (ABS cc) => joinMapElement "L" coordString cc
+          | LINE_TO (REL cc) => joinMapElement "l" coordString cc
           | HORIZONTAL_TO (ABS x) => "H " ^ realString x
           | HORIZONTAL_TO (REL x) => "h " ^ realString x
           | VERTICAL_TO (ABS y) => "V " ^ realString y
           | VERTICAL_TO (REL y) => "v " ^ realString y
-          | CUBIC_TO (ABS pp) => joinMap " " (fn p => "C " ^ cubicString p) pp
-          | CUBIC_TO (REL pp) => joinMap " " (fn p => "c " ^ cubicString p) pp
-          | QUADRATIC_TO (ABS pp) => joinMap " " (fn p => "Q " ^ quadraticString p) pp
-          | QUADRATIC_TO (REL pp) => joinMap " " (fn p => "q " ^ quadraticString p) pp
-          | ARC_TO (ABS aa) => joinMap " " (fn a => "A " ^ arcToString a) aa
-          | ARC_TO (REL aa) => joinMap " " (fn a => "a " ^ arcToString a) aa
+          | CUBIC_TO (ABS pp) => joinMapElement "C" cubicString pp
+          | CUBIC_TO (REL pp) => joinMapElement "c" cubicString pp
+          | QUADRATIC_TO (ABS pp) => joinMapElement "Q" quadraticString pp
+          | QUADRATIC_TO (REL pp) => joinMapElement "q" quadraticString pp
+          | ARC_TO (ABS aa) => joinMapElement "A" arcString aa
+          | ARC_TO (REL aa) => joinMapElement "a" arcString aa
           | CLOSE_PATH => "Z"
           | other => "" (*!!!*)
                            
