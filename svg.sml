@@ -219,7 +219,16 @@ end = struct
                           target = (x, y) } =
         realString x1 ^ " " ^ realString y1 ^ "," ^
         realString x ^ " " ^ realString y
-                                                                        
+
+    fun arcToString { radii = (rx, ry),
+                      rotation, largeArc, sweep,
+                      target = (x, y) } =
+        realString rx ^ "," ^ realString ry ^ " " ^
+        realString rotation ^ " " ^
+        (if largeArc then "1 " else "0 ") ^
+        (if sweep then "1 " else "0 ") ^
+        realString x ^ "," ^ realString y
+                                        
     fun escapeTextData str =
         String.translate (fn #"<" => "&lt;"
                            | #">" => "&gt;"
@@ -240,6 +249,8 @@ end = struct
           | CUBIC_TO (REL pp) => joinMap " " (fn p => "c " ^ cubicString p) pp
           | QUADRATIC_TO (ABS pp) => joinMap " " (fn p => "Q " ^ quadraticString p) pp
           | QUADRATIC_TO (REL pp) => joinMap " " (fn p => "q " ^ quadraticString p) pp
+          | ARC_TO (ABS aa) => joinMap " " (fn a => "A " ^ arcToString a) aa
+          | ARC_TO (REL aa) => joinMap " " (fn a => "a " ^ arcToString a) aa
           | CLOSE_PATH => "Z"
           | other => "" (*!!!*)
                            
