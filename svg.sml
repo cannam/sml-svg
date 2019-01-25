@@ -266,11 +266,14 @@ end = struct
             PATH pp => " d=\"" ^ joinMap " " pathElementText pp ^ "\""
           | RECT { origin, size } => " " ^ coordAttrString origin ^
                                      " " ^ dimenAttrString size
+          | CIRCLE { centre, radius } => " cx=\"" ^ realString (#1 centre) ^
+                                         "\" cy=\"" ^ realString (#2 centre) ^
+                                         "\" r=\"" ^ realString radius ^ "\""
+          | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
+          | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | TEXT { origin, rotation, text } => " " ^ coordAttrString origin ^
                                                " rotate=\"" ^
                                                realString rotation ^ "\""
-          | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
-          | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | _ => "" (*!!! *)
                            
     fun propertyName p =
