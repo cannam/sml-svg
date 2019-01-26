@@ -273,6 +273,10 @@ end = struct
                                          "\" cy=\"" ^ realString (#2 centre) ^
                                          "\" rx=\"" ^ realString (#1 radii) ^
                                          "\" ry=\"" ^ realString (#2 radii) ^ "\""
+          | LINE { source, target } => " x1=\"" ^ realString (#1 source) ^
+                                       "\" y1=\"" ^ realString (#2 source) ^
+                                       "\" x2=\"" ^ realString (#1 target) ^
+                                       "\" y2=\"" ^ realString (#2 target) ^ "\""
           | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | TEXT { origin, rotation, text } => " " ^ coordAttrString origin ^
