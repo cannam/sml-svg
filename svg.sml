@@ -269,6 +269,10 @@ end = struct
           | CIRCLE { centre, radius } => " cx=\"" ^ realString (#1 centre) ^
                                          "\" cy=\"" ^ realString (#2 centre) ^
                                          "\" r=\"" ^ realString radius ^ "\""
+          | ELLIPSE { centre, radii } => " cx=\"" ^ realString (#1 centre) ^
+                                         "\" cy=\"" ^ realString (#2 centre) ^
+                                         "\" rx=\"" ^ realString (#1 radii) ^
+                                         "\" ry=\"" ^ realString (#2 radii) ^ "\""
           | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
           | TEXT { origin, rotation, text } => " " ^ coordAttrString origin ^
