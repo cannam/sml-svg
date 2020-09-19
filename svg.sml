@@ -195,11 +195,15 @@ end = struct
           | GROUP _ => "g"
 
     fun realString r =
-        implode
-            (case rev (map (fn #"~" => #"-" | c => c)
-                           (explode (Real.toString r))) of
-                 (#"0")::(#".")::s => rev s
-               | s => rev s)
+        if r < 0.0
+        then "-" ^ realString (~r)
+        else 
+            let val epsilon = 1E~9
+            in
+                if Real.abs (r - Real.realRound r) < epsilon
+                then Int.toString (Real.round r)
+                else Real.fmt (StringCvt.FIX (SOME 6)) r
+            end
 
     fun joinMap j f xs = String.concatWith j (map f xs)
 
