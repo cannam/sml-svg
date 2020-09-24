@@ -175,6 +175,7 @@ end
 structure SvgSerialise :> sig
 
     val serialiseContent : Svg.content -> string
+    val serialiseDocumentAtScale : real -> Svg.svg -> string
     val serialiseDocument : Svg.svg -> string
                                                      
 end = struct
@@ -216,8 +217,11 @@ end = struct
     fun coordAttrString (x, y) =
         "x=\"" ^ realString x ^ "\" y=\"" ^ realString y ^ "\""
 
-    fun dimenAttrString (x, y) =
-        "width=\"" ^ realString x ^ "\" height=\"" ^ realString y ^ "\""
+    fun dimenAttrStringWithUnit unit (x, y) =
+        "width=\"" ^ realString x ^ unit ^
+        "\" height=\"" ^ realString y ^ unit ^ "\""
+
+    val dimenAttrString = dimenAttrStringWithUnit ""
 
     fun cubicString { control1 = (x1, y1),
                       control2 = (x2, y2),
@@ -404,9 +408,23 @@ end = struct
     and serialiseContent svg =
         String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
 
-    fun serialiseDocument ({ size, content } : svg) =
+    val header = 
         "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
-        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n" ^
+        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n"
+                                                                              
+    fun serialiseDocumentAtScale mmPerPixel ({ size, content } : svg) =
+        let val scale = mmPerPixel * (9.6 / 2.54)
+        in
+            header ^
+            "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrStringWithUnit "mm" size ^ ">\n" ^
+            "<g transform=\"scale(" ^ realString scale ^ "," ^ realString scale ^ ")\">\n" ^
+            serialiseContent content ^
+            "</g>\n" ^
+            "</svg>\n"
+        end
+
+    fun serialiseDocument ({ size, content } : svg) =
+        header ^
         "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrString size ^ ">\n" ^
         serialiseContent content ^
         "</svg>\n"
