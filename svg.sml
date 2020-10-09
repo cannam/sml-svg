@@ -172,15 +172,25 @@ in
 end
 end
 
-structure SvgSerialise :> sig
+signature SVG_SERIALISE = sig
+    type t
+    val serialiseContent : Svg.content -> t -> t
+    val serialiseDocumentAtScale : real -> Svg.svg -> t -> t
+    val serialiseDocument : Svg.svg -> t -> t
+end
 
-    val serialiseContent : Svg.content -> string
-    val serialiseDocumentAtScale : real -> Svg.svg -> string
-    val serialiseDocument : Svg.svg -> string
-                                                     
-end = struct
+functor SvgSerialiseFn (OUTPUT : sig
+                            type t
+                            val printString : string -> t -> t
+                            val printReal : real -> t -> t
+                        end) :> SVG_SERIALISE where type t = OUTPUT.t = struct
+
+    type t = OUTPUT.t
 
     open Svg
+
+    fun |> (x, y) = y x
+    infix 1 |>
 
     fun elementName e =
         case e of
@@ -195,6 +205,11 @@ end = struct
           | TEXT _ => "text"
           | GROUP _ => "g"
 
+    fun joinMap j f xs = String.concatWith j (map f xs)
+
+    fun joinMapElement code f [] = ""
+      | joinMapElement code f xs = code ^ " " ^ joinMap " " f xs
+
     fun realString r =
         if r < 0.0
         then "-" ^ realString (~r)
@@ -205,11 +220,6 @@ end = struct
                 then Int.toString (Real.round r)
                 else Real.fmt (StringCvt.FIX (SOME 6)) r
             end
-
-    fun joinMap j f xs = String.concatWith j (map f xs)
-
-    fun joinMapElement code f [] = ""
-      | joinMapElement code f xs = code ^ " " ^ joinMap " " f xs
                 
     fun coordString (x, y) =
         realString x ^ "," ^ realString y
@@ -386,48 +396,97 @@ end = struct
           | FONT_SIZE x => realString x
           | TRANSFORM tt => String.concatWith " " (map transformString tt)
 
-    fun serialiseProperty prop =
-        propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""
+    val header = 
+        "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
+        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n"
 
-    fun serialiseProperties [] = ""
-      | serialiseProperties props =
-        " " ^ String.concatWith " " (map serialiseProperty props)
+    val ps = OUTPUT.printString
 
-    and serialiseElementWith proptext elt =
-        "<" ^ elementName elt ^ elementAttributes elt ^ proptext ^
-        (case elt of
-             GROUP content =>
-             ">" ^ serialiseContent content ^ "</" ^ elementName elt ^ ">"
-           | TEXT { text, ... } =>
-             ">" ^ escapeTextData text ^ "</" ^ elementName elt ^ ">" (*!!! handle common close-element logic *)
-           | other => "/>")
+    fun serialiseProperty prop t =
+        ps (propertyName prop) t
+           |> ps "=\""
+           |> ps (propertyValueString prop)
+           |> ps "\""
 
-    and serialiseDecoratedElement (elt, props) =
-        serialiseElementWith (serialiseProperties props) elt
+    fun serialiseProperties [] t = t
+      | serialiseProperties (p::pp) t =
+        ps " " t 
+           |> serialiseProperty p
+           |> serialiseProperties pp
+           
+    and serialiseGroupWith proptext elt content t =
+        ps ("<g" ^ elementAttributes elt ^ proptext ^ ">") t 
+            |> serialiseContent content
+            |> ps "</g>"
+           
+    and serialiseTextWith proptext elt text t =
+        ps ("<text" ^ elementAttributes elt ^ proptext ^ ">") t 
+            |> ps (escapeTextData text)
+            |> ps "</text>"
+
+    and serialiseOtherElementWith proptext elt t =
+        ps ("<" ^ elementName elt ^ elementAttributes elt ^ proptext ^ "/>") t 
+            
+    and serialiseElementWith proptext elt t =
+        case elt of
+            GROUP content => serialiseGroupWith proptext elt content t
+          | TEXT text => serialiseTextWith proptext elt text t
+          | other => serialiseOtherElementWith proptext other t
+
+    and serialiseDecoratedElement (elt, props) t =
+        serialiseElementWith (serialiseProperties props) elt t
 
     and serialiseContent svg =
         String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
 
-    val header = 
-        "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
-        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n"
-                                                                              
-    fun serialiseDocumentAtScale mmPerPixel ({ size, content } : svg) =
+    fun serialiseDocumentAtScale t mmPerPixel ({ size, content } : svg) =
         let val scale = mmPerPixel * (9.6 / 2.54)
         in
-            header ^
-            "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrStringWithUnit "mm" size ^ ">\n" ^
-            "<g transform=\"scale(" ^ realString scale ^ "," ^ realString scale ^ ")\">\n" ^
-            serialiseContent content ^
-            "</g>\n" ^
-            "</svg>\n"
+            ps header t 
+                |> ps "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+                |> ps (dimenAttrStringWithUnit "mm" size)
+                |> ps ">\n"
+                |> ps ("<g transform=\"scale(" ^ realString scale ^ "," ^ realString scale ^ ")\">\n")
+                |> ps (serialiseContent content)
+                |> ps "</g>\n"
+                |> ps "</svg>\n"
         end
-
-    fun serialiseDocument ({ size, content } : svg) =
-        header ^
-        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrString size ^ ">\n" ^
-        serialiseContent content ^
-        "</svg>\n"
+            
+    fun serialiseDocument t ({ size, content } : svg) =
+        ps header t 
+            |> ps "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+            |> ps (dimenAttrString size)
+            |> ps ">\n"
+            |> ps (serialiseContent content)
+            |> ps "</svg>\n"
 
 end
                   
+structure SvgStringSerialise :> sig
+              val serialiseContent : Svg.content -> string
+              val serialiseDocumentAtScale : real -> Svg.svg -> string
+              val serialiseDocument : Svg.svg -> string
+          end = struct
+
+    fun realString r =
+        if r < 0.0
+        then "-" ^ realString (~r)
+        else 
+            let val epsilon = 1E~9
+            in
+                if Real.abs (r - Real.realRound r) < epsilon
+                then Int.toString (Real.round r)
+                else Real.fmt (StringCvt.FIX (SOME 6)) r
+            end
+
+    structure S = SvgSerialiseFn(struct
+                                  type t = string
+                                  fun begin () = ""
+                                  fun printString s s' = s ^ s'
+                                  fun printReal s r = s ^ realString r
+                                  end)
+
+    open S
+                                
+end
+                             
