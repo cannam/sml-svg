@@ -34,6 +34,9 @@ structure Svg = struct
     datatype linejoin = MITRE | ROUND_JOIN | BEVEL
     datatype fontstyle = NORMAL | ITALIC | OBLIQUE
     datatype fillrule = NON_ZERO | EVEN_ODD
+    datatype vectoreffect = DEFAULT_STROKE | NON_SCALING_STROKE
+    datatype shaperendering =
+             DEFAULT_RENDERING | OPTIMIZE_SPEED | CRISP_EDGES | GEOMETRIC_PRECISION
 
     datatype transform =
              MATRIX of real * real * real * real * real * real |
@@ -50,6 +53,8 @@ structure Svg = struct
              STROKE_LINEJOIN of linejoin |
              STROKE_DASHARRAY of real list |
              STROKE_OPACITY of real |
+             VECTOR_EFFECT of vectoreffect |
+             SHAPE_RENDERING of shaperendering |
              FILL of paint |
              FILL_RULE of fillrule |
              FILL_OPACITY of real |
@@ -300,6 +305,8 @@ end = struct
           | STROKE_LINEJOIN _ => "stroke-linejoin"
           | STROKE_DASHARRAY _ => "stroke-dasharray"
           | STROKE_OPACITY _ => "stroke-opacity"
+          | VECTOR_EFFECT _ => "vector-effect"
+          | SHAPE_RENDERING _ => "shape-rendering"
           | FILL _ => "fill"
           | FILL_RULE _ => "fill-rule"
           | FILL_OPACITY _ => "fill-opacity"
@@ -367,7 +374,19 @@ end = struct
         case r of
             NON_ZERO => "non-zero"
           | EVEN_ODD => "even-odd"
-                                    
+
+    fun vectorEffectName e =
+        case e of
+            DEFAULT_STROKE => "auto"
+          | NON_SCALING_STROKE => "non-scaling-stroke"
+
+    fun shapeRenderingName r =
+        case r of
+            DEFAULT_RENDERING => "auto"
+          | OPTIMIZE_SPEED => "optimizeSpeed"
+          | CRISP_EDGES => "crispEdges"
+          | GEOMETRIC_PRECISION => "geometricPrecision"
+                                      
     fun propertyValueString p =
         case p of
             STROKE x => paintString x
@@ -380,6 +399,8 @@ end = struct
           | FILL_RULE x => fillRuleName x
           | FILL_OPACITY x => realString x
           | OPACITY x => realString x
+          | VECTOR_EFFECT e => vectorEffectName e
+          | SHAPE_RENDERING r => shapeRenderingName r
           | FONT_FAMILY x => String.concatWith ", " x
           | FONT_STYLE x => fontStyleName x
           | FONT_WEIGHT x => Int.toString x
