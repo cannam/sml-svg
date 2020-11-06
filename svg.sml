@@ -177,13 +177,31 @@ in
 end
 end
 
-structure SvgSerialise :> sig
+signature SVG_SERIALISER = sig
+
+    type outstream
+    
+    val serialiseContent : outstream -> Svg.content -> unit
+    val serialiseDocumentAtScale : outstream -> real -> Svg.svg -> unit
+    val serialiseDocument : outstream -> Svg.svg -> unit
+                                           
+end
+
+signature SVG_STRING_SERIALISER = sig
 
     val serialiseContent : Svg.content -> string
     val serialiseDocumentAtScale : real -> Svg.svg -> string
     val serialiseDocument : Svg.svg -> string
-                                                     
-end = struct
+    
+end
+                               
+functor SvgSerialiserFn (S : sig
+                             type outstream
+                             val output : outstream * string -> unit
+                         end)
+        :> SVG_SERIALISER where type outstream = S.outstream = struct
+
+    type outstream = S.outstream
 
     open Svg
 
@@ -201,102 +219,139 @@ end = struct
           | GROUP _ => "g"
 
     fun realString r =
-        if r < 0.0
-        then "-" ^ realString (~r)
-        else 
-            let val epsilon = 1E~9
+        if Real.isFinite r andalso
+           Real.<= (Real.abs r, 1e6)
+        then 
+            let val epsilon = 1E~8
             in
                 if Real.abs (r - Real.realRound r) < epsilon
-                then Int.toString (Real.round r)
-                else Real.fmt (StringCvt.FIX (SOME 6)) r
+                then StringInterpolate.I (Real.round r)
+                else StringInterpolate.R r
             end
+        else
+            StringInterpolate.R r
 
-    fun joinMap j f xs = String.concatWith j (map f xs)
+    val R = realString
+    val Q = "\""
+    fun QR r = Q ^ R r ^ Q
+    val SP = " "
+    val COMMA = ","
+                             
+    fun writeOne out str =
+        S.output (out, str)
+           
+    fun write out strings =
+        List.app (fn s => S.output (out, s)) strings
 
-    fun joinMapElement code f [] = ""
-      | joinMapElement code f xs = code ^ " " ^ joinMap " " f xs
-                
-    fun coordString (x, y) =
-        realString x ^ "," ^ realString y
+    fun writeSequenceWith out writer separator [] = ()
+      | writeSequenceWith out writer separator [x] =
+        writer out x
+      | writeSequenceWith out writer separator (x::xs) =
+        (writer out x;
+         writeOne out separator;
+         writeSequenceWith out writer separator xs)
 
-    fun coordAttrString (x, y) =
-        "x=\"" ^ realString x ^ "\" y=\"" ^ realString y ^ "\""
+    fun writeList out writer values =
+        writeSequenceWith out writer COMMA values
 
-    fun dimenAttrStringWithUnit unit (x, y) =
-        "width=\"" ^ realString x ^ unit ^
-        "\" height=\"" ^ realString y ^ unit ^ "\""
+    fun writeSequence out writer values =
+        writeSequenceWith out writer SP values
+            
+    fun writeSequenceElement out code writer values =
+        (write out [code, SP]; writeSequence out writer values)
 
-    val dimenAttrString = dimenAttrStringWithUnit ""
+    fun writeReal out r =
+        writeOne out (R r)
+            
+    fun writeCoords out (x, y) =
+        write out [R x, COMMA, R y]
 
-    fun cubicString { control1 = (x1, y1),
-                      control2 = (x2, y2),
-                      target = (x, y) } =
-        realString x1 ^ " " ^ realString y1 ^ "," ^
-        realString x2 ^ " " ^ realString y2 ^ "," ^
-        realString x ^ " " ^ realString y
+    fun writeCoordAttrs out (x, y) =
+        write out ["x=", QR x, " ", "y=", QR y]
+              
+    fun writeDimenAttrsWithUnit out unit (w, h) =
+        write out ["width=",  Q, R w, unit, Q, " ", "height=", Q, R h, unit, Q]
 
-    fun quadraticString { control = (x1, y1),
-                          target = (x, y) } =
-        realString x1 ^ " " ^ realString y1 ^ "," ^
-        realString x ^ " " ^ realString y
+    fun writeDimenAttrs out =
+        writeDimenAttrsWithUnit out ""
 
-    fun arcString { radii = (rx, ry),
-                    rotation, largeArc, sweep,
-                    target = (x, y) } =
-        realString rx ^ "," ^ realString ry ^ " " ^
-        realString rotation ^ " " ^
-        (if largeArc then "1 " else "0 ") ^
-        (if sweep then "1 " else "0 ") ^
-        realString x ^ "," ^ realString y
+    fun writeCubic out { control1 = (x1, y1),
+                         control2 = (x2, y2),
+                         target = (x, y) } =
+        write out [R x1, SP, R y1, COMMA,
+                   R x2, SP, R y2, COMMA,
+                   R x, SP, R y]
+
+    fun writeQuadratic out { control = (x1, y1),
+                             target = (x, y) } =
+        write out [R x1, SP, R y1, COMMA,
+                   R x, SP, R y]
+
+    fun writeArc out { radii = (rx, ry),
+                       rotation, largeArc, sweep,
+                       target = (x, y) } =
+        write out [R rx, COMMA, R ry, SP, R rotation, SP,
+                   (if largeArc then "1 " else "0 "),
+                   (if sweep then "1 " else "0 "),
+                   R x, COMMA, R y]
                                         
     fun escapeTextData str =
         String.translate (fn #"<" => "&lt;"
                            | #">" => "&gt;"
                            | #"&" => "&amp;"
-                           | c => Char.toString c) str
+                           | c => String.str c) str
                                                                         
-    fun pathElementText pe =
-        case pe of
-            MOVE_TO (ABS c) => "M " ^ coordString c
-          | MOVE_TO (REL c) => "m " ^ coordString c
-          | LINE_TO (ABS cc) => joinMapElement "L" coordString cc
-          | LINE_TO (REL cc) => joinMapElement "l" coordString cc
-          | HORIZONTAL_TO (ABS x) => "H " ^ realString x
-          | HORIZONTAL_TO (REL x) => "h " ^ realString x
-          | VERTICAL_TO (ABS y) => "V " ^ realString y
-          | VERTICAL_TO (REL y) => "v " ^ realString y
-          | CUBIC_TO (ABS pp) => joinMapElement "C" cubicString pp
-          | CUBIC_TO (REL pp) => joinMapElement "c" cubicString pp
-          | QUADRATIC_TO (ABS pp) => joinMapElement "Q" quadraticString pp
-          | QUADRATIC_TO (REL pp) => joinMapElement "q" quadraticString pp
-          | ARC_TO (ABS aa) => joinMapElement "A" arcString aa
-          | ARC_TO (REL aa) => joinMapElement "a" arcString aa
-          | CLOSE_PATH => "Z"
-          | other => "" (*!!!*)
+    fun writePathElement out pe =
+        let val w = writeOne out
+            val seqElt = writeSequenceElement
+        in
+            case pe of
+                MOVE_TO (ABS c) => (w "M "; writeCoords out c)
+              | MOVE_TO (REL c) => (w "m "; writeCoords out c)
+              | LINE_TO (ABS cc) => seqElt out "L" writeCoords cc
+              | LINE_TO (REL cc) => seqElt out "l" writeCoords cc
+              | HORIZONTAL_TO (ABS x) => (w "H "; writeReal out x)
+              | HORIZONTAL_TO (REL x) => (w "h "; writeReal out x)
+              | VERTICAL_TO (ABS y) => (w "V "; writeReal out y)
+              | VERTICAL_TO (REL y) => (w "v "; writeReal out y)
+              | CUBIC_TO (ABS pp) => seqElt out "C" writeCubic pp
+              | CUBIC_TO (REL pp) => seqElt out "c" writeCubic pp
+              | QUADRATIC_TO (ABS pp) => seqElt out "Q" writeQuadratic pp
+              | QUADRATIC_TO (REL pp) => seqElt out "q" writeQuadratic pp
+              | ARC_TO (ABS aa) => seqElt out "A" writeArc aa
+              | ARC_TO (REL aa) => seqElt out "a" writeArc aa
+              | CLOSE_PATH => w "Z"
+              | other => () (*!!!*)
+        end
                            
-    fun elementAttributes e =
-        case e of
-            PATH pp => " d=\"" ^ joinMap " " pathElementText pp ^ "\""
-          | RECT { origin, size } => " " ^ coordAttrString origin ^
-                                     " " ^ dimenAttrString size
-          | CIRCLE { centre, radius } => " cx=\"" ^ realString (#1 centre) ^
-                                         "\" cy=\"" ^ realString (#2 centre) ^
-                                         "\" r=\"" ^ realString radius ^ "\""
-          | ELLIPSE { centre, radii } => " cx=\"" ^ realString (#1 centre) ^
-                                         "\" cy=\"" ^ realString (#2 centre) ^
-                                         "\" rx=\"" ^ realString (#1 radii) ^
-                                         "\" ry=\"" ^ realString (#2 radii) ^ "\""
-          | LINE { source, target } => " x1=\"" ^ realString (#1 source) ^
-                                       "\" y1=\"" ^ realString (#2 source) ^
-                                       "\" x2=\"" ^ realString (#1 target) ^
-                                       "\" y2=\"" ^ realString (#2 target) ^ "\""
-          | POLYLINE cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
-          | POLYGON cc => " points=\"" ^ joinMap " " coordString cc ^ "\""
-          | TEXT { origin, rotation, text } => " " ^ coordAttrString origin ^
-                                               " rotate=\"" ^
-                                               realString rotation ^ "\""
-          | _ => "" (*!!! *)
-                           
+    fun writeElementAttributes out e =
+        let val w = writeOne out
+            val seq = writeSequence
+        in
+            case e of
+                PATH pp => (w " d="; w Q; seq out writePathElement pp; w Q)
+              | RECT { origin, size } => (w SP; writeCoordAttrs out origin;
+                                          w SP; writeDimenAttrs out size)
+              | CIRCLE { centre, radius } => write out [" cx=", QR (#1 centre),
+                                                        " cy=", QR (#2 centre),
+                                                        " r=", QR radius]
+              | ELLIPSE { centre, radii } => write out [" cx=", QR (#1 centre),
+                                                        " cy=", QR (#2 centre),
+                                                        " rx=", QR (#1 radii),
+                                                        " ry=", QR (#2 radii)]
+              | LINE { source, target } => write out [" x1=", QR (#1 source),
+                                                      " y1=", QR (#2 source),
+                                                      " x2=", QR (#1 target),
+                                                      " y2=", QR (#2 target)]
+              | POLYLINE cc => (w " points="; w Q; seq out writeCoords cc; w Q)
+              | POLYGON cc => (w " points="; w Q; seq out writeCoords cc; w Q)
+              | TEXT { origin, rotation, text } => (w SP;
+                                                    writeCoordAttrs out origin;
+                                                    w " rotate=";
+                                                    w (QR rotation))
+              | _ => () (*!!! *)
+        end
+            
     fun propertyName p =
         case p of
             STROKE _ => "stroke"
@@ -326,25 +381,26 @@ end = struct
           | SKEW_X _ => "skewX"
           | SKEW_Y _ => "skewY"
 
-    fun transformArgString t =
-        String.concatWith
-            ","
-            (map realString
-                 (case t of
-                      MATRIX (a,b,c,d,e,f) => [a,b,c,d,e,f]
-                    | TRANSLATE (x,y) => [x,y]
-                    | SCALE (sx,sy) => [sx,sy]
-                    | ROTATE r => [r]
-                    | SKEW_X s => [s]
-                    | SKEW_Y s => [s]))
+    fun writeTransformArgs out t =
+        writeList out writeReal 
+                  (case t of
+                       MATRIX (a,b,c,d,e,f) => [a,b,c,d,e,f]
+                     | TRANSLATE (x,y) => [x,y]
+                     | SCALE (sx,sy) => [sx,sy]
+                     | ROTATE r => [r]
+                     | SKEW_X s => [s]
+                     | SKEW_Y s => [s])
                             
-    fun transformString t =
-        transformName t ^ "(" ^ transformArgString t ^ ")"
+    fun writeTransform out t =
+        (writeOne out (transformName t ^ "(");
+         writeTransformArgs out t;
+         writeOne out ")")
                             
     fun rgbString (r, g, b) =
-        "rgb(" ^
-        joinMap "," (fn x => Int.toString (Real.round (x * 255.0))) [r, g, b] ^
-        ")"
+        StringInterpolate.interpolate
+            "rgb(%,%,%)"
+            (map (fn c => StringInterpolate.I (Real.round (c * 255.0)))
+                 [r, g, b])
                                
     fun paintString p =
         case p of
@@ -405,50 +461,121 @@ end = struct
           | FONT_STYLE x => fontStyleName x
           | FONT_WEIGHT x => Int.toString x
           | FONT_SIZE x => realString x
-          | TRANSFORM tt => String.concatWith " " (map transformString tt)
+          | TRANSFORM tt => "" (* should have been dealt with separately by caller *)
 
-    fun serialiseProperty prop =
-        propertyName prop ^ "=\"" ^ propertyValueString prop ^ "\""
+    fun writeProperty out prop =
+        (write out [propertyName prop, "=", Q];
+         case prop of
+             TRANSFORM tt => writeSequence out writeTransform tt
+           | other => writeOne out (propertyValueString prop);
+         writeOne out Q)
 
-    fun serialiseProperties [] = ""
-      | serialiseProperties props =
-        " " ^ String.concatWith " " (map serialiseProperty props)
+    fun writeProperties out [] = ()
+      | writeProperties out props =
+        (writeOne out SP;
+         writeSequence out writeProperty props)
 
-    and serialiseElementWith proptext elt =
-        "<" ^ elementName elt ^ elementAttributes elt ^ proptext ^
-        (case elt of
-             GROUP content =>
-             ">" ^ serialiseContent content ^ "</" ^ elementName elt ^ ">"
-           | TEXT { text, ... } =>
-             ">" ^ escapeTextData text ^ "</" ^ elementName elt ^ ">" (*!!! handle common close-element logic *)
-           | other => "/>")
+    and writeClosingTag out elt =
+        write out ["</", elementName elt, ">"]
+            
+    and writeElementWith out properties elt =
+        (write out ["<", elementName elt];
+         writeElementAttributes out elt;
+         writeProperties out properties;
+         case elt of
+             GROUP content => (writeOne out ">";
+                               writeContent out content;
+                               writeClosingTag out elt)
+           | TEXT { text, ... } => (writeOne out ">";
+                                    writeOne out (escapeTextData text);
+                                    writeClosingTag out elt)
+           | other => (writeOne out "/>")
+        )
 
-    and serialiseDecoratedElement (elt, props) =
-        serialiseElementWith (serialiseProperties props) elt
+    and writeDecoratedElement out (elt, properties) =
+        writeElementWith out properties elt
 
-    and serialiseContent svg =
-        String.concatWith "\n" (List.map serialiseDecoratedElement svg) ^ "\n"
+    and writeContent out svg =
+        (writeSequenceWith out writeDecoratedElement "\n" svg;
+         writeOne out "\n")
 
-    val header = 
-        "<?xml version=\"1.0\" standalone=\"no\"?>\n" ^
-        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n"
-                                                                              
-    fun serialiseDocumentAtScale mmPerPixel ({ size, content } : svg) =
+    fun writeHeaderOpening out =
+        write out ["<?xml version=\"1.0\" standalone=\"no\"?>\n",
+                   "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n",
+                   "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "]
+
+    val serialiseContent = writeContent
+              
+    fun serialiseDocumentAtScale out mmPerPixel ({ size, content } : svg) =
         let val scale = mmPerPixel * (9.6 / 2.54)
         in
-            header ^
-            "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrStringWithUnit "mm" size ^ ">\n" ^
-            "<g transform=\"scale(" ^ realString scale ^ "," ^ realString scale ^ ")\">\n" ^
-            serialiseContent content ^
-            "</g>\n" ^
-            "</svg>\n"
+            writeHeaderOpening out;
+            writeDimenAttrsWithUnit out "mm" size;
+            write out [">\n",
+                       "<g transform=\"scale(",
+                       realString scale,
+                       COMMA,
+                       realString scale,
+                       ")\">\n"];
+            writeContent out content;
+            write out ["</g>\n",
+                       "</svg>\n"]
         end
 
-    fun serialiseDocument ({ size, content } : svg) =
-        header ^
-        "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" " ^ dimenAttrString size ^ ">\n" ^
-        serialiseContent content ^
-        "</svg>\n"
-
+    fun serialiseDocument out ({ size, content } : svg) =
+        (writeHeaderOpening out;
+         writeDimenAttrs out size;
+         writeOne out ">\n";
+         writeContent out content;
+         writeOne out "</svg>\n")
+            
 end
-                  
+
+structure SvgStdoutSerialise :> sig
+
+    val serialiseContent : Svg.content -> unit
+    val serialiseDocumentAtScale : real -> Svg.svg -> unit
+    val serialiseDocument : Svg.svg -> unit
+
+          end = struct
+
+    structure S = SvgSerialiserFn(struct
+                                   type outstream = TextIO.outstream
+                                   val output = TextIO.output
+                                   end)
+
+    val serialiseContent = S.serialiseContent TextIO.stdOut
+    val serialiseDocumentAtScale = S.serialiseDocumentAtScale TextIO.stdOut
+    val serialiseDocument = S.serialiseDocument TextIO.stdOut
+             
+end
+
+structure SvgStringSerialise :> SVG_STRING_SERIALISER = struct
+                         
+    structure S = SvgSerialiserFn(struct
+                                   type outstream = StringBuffer.buffer
+                                   val output = StringBuffer.appendTo
+                                   end)
+
+    fun serialiseContent (content : Svg.content) : string =
+        let val outstream = StringBuffer.new ()
+        in
+            S.serialiseContent outstream content;
+            StringBuffer.toString outstream
+        end
+       
+    fun serialiseDocumentAtScale (scale : real) (document : Svg.svg) : string =
+        let val outstream = StringBuffer.new ()
+        in
+            S.serialiseDocumentAtScale outstream scale document;
+            StringBuffer.toString outstream
+        end
+       
+    fun serialiseDocument (document : Svg.svg) : string =
+        let val outstream = StringBuffer.new ()
+        in
+            S.serialiseDocument outstream document;
+            StringBuffer.toString outstream
+        end
+                                 
+end

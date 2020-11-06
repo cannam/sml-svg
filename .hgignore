@@ -2,4 +2,7 @@ syntax: glob
 *.deps
 *~
 a.out
-glob:.repoint-*.bin
+glob:.repoint*
+example
+output.svg
+mlmon.out
