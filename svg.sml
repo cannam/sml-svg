@@ -201,15 +201,17 @@ end = struct
           | GROUP _ => "g"
 
     fun realString r =
-        if r < 0.0
-        then "-" ^ realString (~r)
-        else 
+        if Real.isFinite r andalso
+           Real.<= (Real.abs r, 1e6)
+        then 
             let val epsilon = 1E~9
             in
                 if Real.abs (r - Real.realRound r) < epsilon
-                then Int.toString (Real.round r)
-                else Real.fmt (StringCvt.FIX (SOME 6)) r
+                then StringInterpolate.I (Real.round r)
+                else StringInterpolate.R r
             end
+        else
+            StringInterpolate.R r
 
     fun joinMap j f xs = String.concatWith j (map f xs)
 

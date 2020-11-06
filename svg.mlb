@@ -1,2 +1,4 @@
 $(SML_LIB)/basis/basis.mlb
+../sml-stringinterpolate/string-interpolate.sig
+../sml-stringinterpolate/string-interpolate.sml
 svg.sml
