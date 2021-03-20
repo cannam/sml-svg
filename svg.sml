@@ -398,7 +398,7 @@ functor SvgSerialiserFn (S : sig
                             
     fun rgbString (r, g, b) =
         StringInterpolate.interpolate
-            "rgb(%,%,%)"
+            "rgb(%1,%2,%3)"
             (map (fn c => StringInterpolate.I (Real.round (c * 255.0)))
                  [r, g, b])
                                
