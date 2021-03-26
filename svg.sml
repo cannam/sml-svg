@@ -299,6 +299,7 @@ functor SvgSerialiserFn (S : sig
         String.translate (fn #"<" => "&lt;"
                            | #">" => "&gt;"
                            | #"&" => "&amp;"
+                           | #"\n" => "&#10;"
                            | c => String.str c) str
                                                                         
     fun writePathElement out pe =
@@ -496,12 +497,11 @@ functor SvgSerialiserFn (S : sig
         writeElementWith out properties elt
 
     and writeContent out svg =
-        (writeSequenceWith out writeDecoratedElement "\n" svg;
-         writeOne out "\n")
+        writeSequenceWith out writeDecoratedElement "" svg
 
     fun writeHeaderOpening out =
-        write out ["<?xml version=\"1.0\" standalone=\"no\"?>\n",
-                   "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n",
+        write out ["<?xml version=\"1.0\" standalone=\"no\"?>",
+                   "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">",
                    "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "]
 
     val serialiseContent = writeContent
@@ -511,23 +511,23 @@ functor SvgSerialiserFn (S : sig
         in
             writeHeaderOpening out;
             writeDimenAttrsWithUnit out "mm" size;
-            write out [">\n",
+            write out [">",
                        "<g transform=\"scale(",
                        realString scale,
                        COMMA,
                        realString scale,
-                       ")\">\n"];
+                       ")\">"];
             writeContent out content;
-            write out ["</g>\n",
-                       "</svg>\n"]
+            write out ["</g>",
+                       "</svg>"]
         end
 
     fun serialiseDocument out ({ size, content } : svg) =
         (writeHeaderOpening out;
          writeDimenAttrs out size;
-         writeOne out ">\n";
+         writeOne out ">";
          writeContent out content;
-         writeOne out "</svg>\n")
+         writeOne out "</svg>")
             
 end
 
