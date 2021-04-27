@@ -4,3 +4,4 @@ $(SML_LIB)/basis/basis.mlb
 ../sml-stringinterpolate/string-buffer.sig
 ../sml-stringinterpolate/string-buffer.sml
 svg.sml
+shorten.sml
