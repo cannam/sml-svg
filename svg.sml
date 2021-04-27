@@ -8,19 +8,21 @@ structure Svg = struct
              ABS of 'a |
              REL of 'a
 
-    datatype path_element =
-             MOVE_TO of coords absrel |
-             LINE_TO of coords list absrel |
-             HORIZONTAL_TO of real absrel |
-             VERTICAL_TO of real absrel |
-             CUBIC_TO of { control1: coords, control2: coords, target: coords } list absrel |
-             CUBIC_SMOOTH_TO of { control2: coords, target: coords } list absrel |
-             QUADRATIC_TO of { control: coords, target: coords } list absrel |
-             QUADRATIC_SMOOTH_TO of { target: coords } list absrel |
+    datatype stroke_form =
+             MOVE_TO of coords |
+             LINE_TO of coords list |
+             HORIZONTAL_TO of real |
+             VERTICAL_TO of real |
+             CUBIC_TO of { control1: coords, control2: coords, target: coords } list |
+             CUBIC_SMOOTH_TO of { control2: coords, target: coords } list |
+             QUADRATIC_TO of { control: coords, target: coords } list |
+             QUADRATIC_SMOOTH_TO of { target: coords } list |
              ARC_TO of { radii: dimens, rotation: real, largeArc: bool,
-                         sweep: bool, target: coords } list absrel |
+                         sweep: bool, target: coords } list |
              CLOSE_PATH
 
+    type path_element = stroke_form absrel
+                 
     type path = path_element list
 
     type text = { origin: coords, rotation: real, text: string }
@@ -87,31 +89,31 @@ end
 
 structure SvgPathShorthand = struct
 
-    val M = Svg.MOVE_TO o Svg.ABS
-    val m = Svg.MOVE_TO o Svg.REL
-    val L = Svg.LINE_TO o Svg.ABS
-    val l = Svg.LINE_TO o Svg.REL
+    val M = Svg.ABS o Svg.MOVE_TO
+    val m = Svg.REL o Svg.MOVE_TO
+    val L = Svg.ABS o Svg.LINE_TO
+    val l = Svg.REL o Svg.LINE_TO
 
-    val H = Svg.HORIZONTAL_TO o Svg.ABS
-    val h = Svg.HORIZONTAL_TO o Svg.REL
-    val V = Svg.VERTICAL_TO o Svg.ABS
-    val v = Svg.VERTICAL_TO o Svg.REL
+    val H = Svg.ABS o Svg.HORIZONTAL_TO
+    val h = Svg.REL o Svg.HORIZONTAL_TO
+    val V = Svg.ABS o Svg.VERTICAL_TO
+    val v = Svg.REL o Svg.VERTICAL_TO
 
-    val C = Svg.CUBIC_TO o Svg.ABS
-    val c = Svg.CUBIC_TO o Svg.REL
-    val S = Svg.CUBIC_SMOOTH_TO o Svg.ABS
-    val s = Svg.CUBIC_SMOOTH_TO o Svg.REL
+    val C = Svg.ABS o Svg.CUBIC_TO
+    val c = Svg.REL o Svg.CUBIC_TO
+    val S = Svg.ABS o Svg.CUBIC_SMOOTH_TO
+    val s = Svg.REL o Svg.CUBIC_SMOOTH_TO
 
-    val Q = Svg.QUADRATIC_TO o Svg.ABS
-    val q = Svg.QUADRATIC_TO o Svg.REL
-    val T = Svg.QUADRATIC_SMOOTH_TO o Svg.ABS
-    val t = Svg.QUADRATIC_SMOOTH_TO o Svg.REL
+    val Q = Svg.ABS o Svg.QUADRATIC_TO
+    val q = Svg.REL o Svg.QUADRATIC_TO
+    val T = Svg.ABS o Svg.QUADRATIC_SMOOTH_TO
+    val t = Svg.REL o Svg.QUADRATIC_SMOOTH_TO
 
-    val A = Svg.ARC_TO o Svg.ABS
-    val a = Svg.ARC_TO o Svg.REL
+    val A = Svg.ABS o Svg.ARC_TO
+    val a = Svg.REL o Svg.ARC_TO
                              
-    val Z = Svg.CLOSE_PATH
-    val z = Z
+    val Z = Svg.ABS Svg.CLOSE_PATH
+    val z = Svg.REL Svg.CLOSE_PATH
 
 end
 
@@ -258,7 +260,7 @@ functor SvgSerialiserFn (S : sig
         writeSequenceWith out writer SP values
             
     fun writeSequenceElement out code writer values =
-        (write out [code, SP]; writeSequence out writer values)
+        (writeOne out code; writeSequence out writer values)
 
     fun writeReal out r =
         writeOne out (R r)
@@ -282,10 +284,18 @@ functor SvgSerialiserFn (S : sig
                    R x2, SP, R y2, COMMA,
                    R x, SP, R y]
 
+    fun writeCubicSmooth out { control2 = (x2, y2),
+                               target = (x, y) } =
+        write out [R x2, SP, R y2, COMMA,
+                   R x, SP, R y]
+
     fun writeQuadratic out { control = (x1, y1),
                              target = (x, y) } =
         write out [R x1, SP, R y1, COMMA,
                    R x, SP, R y]
+
+    fun writeQuadraticSmooth out { target = (x, y) } =
+        write out [R x, SP, R y]
 
     fun writeArc out { radii = (rx, ry),
                        rotation, largeArc, sweep,
@@ -307,22 +317,26 @@ functor SvgSerialiserFn (S : sig
             val seqElt = writeSequenceElement
         in
             case pe of
-                MOVE_TO (ABS c) => (w "M "; writeCoords out c)
-              | MOVE_TO (REL c) => (w "m "; writeCoords out c)
-              | LINE_TO (ABS cc) => seqElt out "L" writeCoords cc
-              | LINE_TO (REL cc) => seqElt out "l" writeCoords cc
-              | HORIZONTAL_TO (ABS x) => (w "H "; writeReal out x)
-              | HORIZONTAL_TO (REL x) => (w "h "; writeReal out x)
-              | VERTICAL_TO (ABS y) => (w "V "; writeReal out y)
-              | VERTICAL_TO (REL y) => (w "v "; writeReal out y)
-              | CUBIC_TO (ABS pp) => seqElt out "C" writeCubic pp
-              | CUBIC_TO (REL pp) => seqElt out "c" writeCubic pp
-              | QUADRATIC_TO (ABS pp) => seqElt out "Q" writeQuadratic pp
-              | QUADRATIC_TO (REL pp) => seqElt out "q" writeQuadratic pp
-              | ARC_TO (ABS aa) => seqElt out "A" writeArc aa
-              | ARC_TO (REL aa) => seqElt out "a" writeArc aa
-              | CLOSE_PATH => w "Z"
-              | other => () (*!!!*)
+                ABS (MOVE_TO c) => (w "M"; writeCoords out c)
+              | REL (MOVE_TO c) => (w "m"; writeCoords out c)
+              | ABS (LINE_TO cc) => seqElt out "L" writeCoords cc
+              | REL (LINE_TO cc) => seqElt out "l" writeCoords cc
+              | ABS (HORIZONTAL_TO x) => (w "H"; writeReal out x)
+              | REL (HORIZONTAL_TO x) => (w "h"; writeReal out x)
+              | ABS (VERTICAL_TO y) => (w "V"; writeReal out y)
+              | REL (VERTICAL_TO y) => (w "v"; writeReal out y)
+              | ABS (CUBIC_TO pp) => seqElt out "C" writeCubic pp
+              | REL (CUBIC_TO pp) => seqElt out "c" writeCubic pp
+              | ABS (CUBIC_SMOOTH_TO pp) => seqElt out "S" writeCubicSmooth pp
+              | REL (CUBIC_SMOOTH_TO pp) => seqElt out "s" writeCubicSmooth pp
+              | ABS (QUADRATIC_TO pp) => seqElt out "Q" writeQuadratic pp
+              | REL (QUADRATIC_TO pp) => seqElt out "q" writeQuadratic pp
+              | ABS (QUADRATIC_SMOOTH_TO pp) => seqElt out "T" writeQuadraticSmooth pp
+              | REL (QUADRATIC_SMOOTH_TO pp) => seqElt out "t" writeQuadraticSmooth pp
+              | ABS (ARC_TO aa) => seqElt out "A" writeArc aa
+              | REL (ARC_TO aa) => seqElt out "a" writeArc aa
+              | ABS CLOSE_PATH => w "Z"
+              | REL CLOSE_PATH => w "z"
         end
                            
     fun writeElementAttributes out e =
@@ -333,6 +347,11 @@ functor SvgSerialiserFn (S : sig
                 PATH pp => (w " d="; w Q; seq out writePathElement pp; w Q)
               | RECT { origin, size } => (w SP; writeCoordAttrs out origin;
                                           w SP; writeDimenAttrs out size)
+              | ROUNDED_RECT { origin, size,
+                               radii } => (w SP; writeCoordAttrs out origin;
+                                           w SP; writeDimenAttrs out size;
+                                           write out [" rx=", QR (#1 radii),
+                                                      " ry=", QR (#2 radii)])
               | CIRCLE { centre, radius } => write out [" cx=", QR (#1 centre),
                                                         " cy=", QR (#2 centre),
                                                         " r=", QR radius]
@@ -350,7 +369,7 @@ functor SvgSerialiserFn (S : sig
                                                     writeCoordAttrs out origin;
                                                     w " rotate=";
                                                     w (QR rotation))
-              | _ => () (*!!! *)
+              | GROUP _ => ()
         end
             
     fun propertyName p =
