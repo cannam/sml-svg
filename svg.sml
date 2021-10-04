@@ -569,6 +569,44 @@ structure SvgStdoutSerialise :> sig
              
 end
 
+structure SvgFileSerialise :> sig
+
+    val serialiseContent : string -> Svg.content -> unit
+    val serialiseDocumentAtScale : string -> real -> Svg.svg -> unit
+    val serialiseDocument : string -> Svg.svg -> unit
+
+          end = struct
+
+    structure S = SvgSerialiserFn(struct
+                                   type outstream = TextIO.outstream
+                                   val output = TextIO.output
+                                   end)
+
+    fun serialiseContent filename =
+        let val stream = TextIO.openOut filename
+        in
+            fn content => 
+               S.serialiseContent stream content before
+               TextIO.closeOut stream
+        end
+
+    fun serialiseDocumentAtScale filename =
+        let val stream = TextIO.openOut filename
+        in
+            fn scale => fn document =>
+               S.serialiseDocumentAtScale stream scale document before
+               TextIO.closeOut stream
+        end
+
+    fun serialiseDocument filename =
+        let val stream = TextIO.openOut filename
+        in
+            fn document => 
+               S.serialiseDocument stream document before
+               TextIO.closeOut stream
+        end
+end
+
 structure SvgStringSerialise :> SVG_STRING_SERIALISER = struct
                          
     structure S = SvgSerialiserFn(struct
