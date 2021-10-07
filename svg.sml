@@ -64,7 +64,7 @@ structure Svg = struct
              FONT_FAMILY of string list |
              FONT_STYLE of fontstyle |
              FONT_WEIGHT of int | (* !!! iffy *)
-             FONT_SIZE of real | (* !!! nope *)
+             FONT_SIZE of real |
              TRANSFORM of transform list
 
     type 'a decorated = 'a * property list
