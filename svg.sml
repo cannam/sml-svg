@@ -1,8 +1,8 @@
 
 structure Svg = struct
 
-    type coords = real * real
-    type dimens = real * real
+    type coords = real * real  (* x, y *)
+    type dimens = real * real  (* width, height *)
 
     datatype 'a absrel =
              ABS of 'a |
