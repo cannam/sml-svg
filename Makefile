@@ -1,5 +1,5 @@
 
-SCRIPTS		:= ext/sml-buildscripts
+SCRIPTS		:= ../sml-buildscripts
 
 all:	${SCRIPTS} example
 
