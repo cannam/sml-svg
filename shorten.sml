@@ -1,11 +1,21 @@
 
 structure SvgShorten : sig
+
               (** Take a path containing lots of absolute move/line
                   segments, and convert it to an equivalent path using
                   relative segments and horizontal/vertical commands
                   for cases where that seems it will shorten the
                   result. *)
-              val shortenPath : Svg.path_element list -> Svg.path_element list
+              val shortenPath : Svg.path_element list ->
+                                Svg.path_element list
+
+              (** As shortenPath, but also round to the nearest
+                  integer any value within epsilon of it. (shortenPath
+                  rounds values only if they are within 1.0e~8.) *)
+              val shortenPathWith : { epsilon : real } ->
+                                    Svg.path_element list ->
+                                    Svg.path_element list
+
           end = struct
 
     open Svg
@@ -56,51 +66,63 @@ structure SvgShorten : sig
           | _ => 
             raise Fail "this form should have been handled already"
 
-    fun pick (xabs, yabs) (xrel, yrel) =
-        let val epsilon = 1E~8
-            fun isIntIsh r = Real.abs (r - Real.realRound r) < epsilon
+    fun isCloseToInt epsilon r = Real.abs (r - Real.realRound r) < epsilon
+    fun roundIfClose epsilon r = if isCloseToInt epsilon r
+                                 then Real.realRound r
+                                 else r
+                  
+    fun pick epsilon (xabs, yabs) (xrel, yrel) =
+        let val round' = roundIfClose epsilon
+            val (rxr, ryr) = (round' xrel, round' yrel)
         in
-            if (isIntIsh xrel orelse isIntIsh yrel)
-            then REL (xrel, yrel)
-            else if (isIntIsh xabs andalso isIntIsh yabs)
-            then ABS (xabs, yabs)
-            else REL (xrel, yrel)
+            if Real.!= (rxr, xrel) orelse Real.!= (ryr, yrel)
+            then REL (rxr, ryr)
+            else let val (rxa, rya) = (round' xabs, round' yabs)
+                 in
+                     if Real.!= (rxa, xabs) orelse Real.!= (rya, yabs)
+                     then ABS (rxa, rya)
+                     else REL (rxr, ryr)
+                 end
         end
                   
-    fun shortenFolder (elt, (acc, posMaybe)) =
-        case elt of
-            REL form => ((elt :: acc),
-                         case posMaybe of
-                             NONE => NONE
-                           | SOME pos => relTarget pos form)
-          | ABS form =>
-            let val newPosMaybe = case form of
-                                      CLOSE_PATH => NONE
-                                    | _ => absTarget form
-                val adjustedElt =
-                    case (posMaybe, newPosMaybe, form) of
-                        (NONE, _, _) => elt
-                      | (_, NONE, _) => elt
-                      | (_, _, CUBIC_TO _) => elt
-                      | (_, _, CUBIC_SMOOTH_TO _) => elt
-                      | (_, _, QUADRATIC_TO _) => elt
-                      | (_, _, QUADRATIC_SMOOTH_TO _) => elt
-                      | (_, _, ARC_TO _) => elt
-                      | (SOME (x, y), _, LINE_TO [(x', y')]) =>
-                        (if Real.== (y, y')
-                         then REL (HORIZONTAL_TO (x'-x))
-                         else if Real.== (x, x')
-                         then REL (VERTICAL_TO (y'-y))
-                         else case pick (x', y') (x'-x, y'-y) of
-                                  ABS (x, y) => elt
-                                | REL (x, y) => REL (LINE_TO [(x, y)]))
-                      | (SOME (x, y), SOME (x', y'), form) =>
-                        case pick (x', y') (x'-x, y'-y) of
-                            ABS (x, y) => elt
-                          | REL (x, y) => REL (withTarget (x, y) form)
-            in
-                (adjustedElt :: acc, newPosMaybe)
-            end
+    fun shortenFolder epsilon =
+        let val pick' = pick epsilon
+        in
+            fn (elt, (acc, posMaybe)) =>
+               case elt of
+                   REL form => ((elt :: acc),
+                                case posMaybe of
+                                    NONE => NONE
+                                  | SOME pos => relTarget pos form)
+                 | ABS form =>
+                   let val newPosMaybe = case form of
+                                             CLOSE_PATH => NONE
+                                           | _ => absTarget form
+                       val adjustedElt =
+                           case (posMaybe, newPosMaybe, form) of
+                               (NONE, _, _) => elt
+                             | (_, NONE, _) => elt
+                             | (_, _, CUBIC_TO _) => elt
+                             | (_, _, CUBIC_SMOOTH_TO _) => elt
+                             | (_, _, QUADRATIC_TO _) => elt
+                             | (_, _, QUADRATIC_SMOOTH_TO _) => elt
+                             | (_, _, ARC_TO _) => elt
+                             | (SOME (x, y), _, LINE_TO [(x', y')]) =>
+                               (if Real.== (y, y')
+                                then REL (HORIZONTAL_TO (x'-x))
+                                else if Real.== (x, x')
+                                then REL (VERTICAL_TO (y'-y))
+                                else case pick' (x', y') (x'-x, y'-y) of
+                                         ABS (x, y) => elt
+                                       | REL (x, y) => REL (LINE_TO [(x, y)]))
+                             | (SOME (x, y), SOME (x', y'), form) =>
+                               case pick' (x', y') (x'-x, y'-y) of
+                                   ABS (x, y) => elt
+                                 | REL (x, y) => REL (withTarget (x, y) form)
+                   in
+                       (adjustedElt :: acc, newPosMaybe)
+                   end
+        end
 
     fun implodeHorizVert (path : Svg.path_element list)
         : Svg.path_element list =
@@ -154,12 +176,19 @@ structure SvgShorten : sig
                            | other => [other])
                          path)
                 
-    fun shortenPath (path : Svg.path_element list)
+    fun shortenPathWith { epsilon : real } (path : Svg.path_element list)
         : Svg.path_element list =
         case path of
             [] => []
           | path =>
-            case foldl shortenFolder ([], NONE) (explodeLines path) of
-                (acc, _) => implodeHorizVert (implodeLines (rev acc))
+            case foldl (shortenFolder epsilon)
+                       ([], NONE)
+                       (explodeLines path) of
+                (acc, _) =>
+                implodeHorizVert (implodeLines (rev acc))
+                
+    fun shortenPath (path : Svg.path_element list)
+        : Svg.path_element list =
+        shortenPathWith { epsilon = 1E~8 } path
 
 end
