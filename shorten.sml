@@ -108,9 +108,9 @@ structure SvgShorten : sig
                              | (_, _, QUADRATIC_SMOOTH_TO _) => elt
                              | (_, _, ARC_TO _) => elt
                              | (SOME (x, y), _, LINE_TO [(x', y')]) =>
-                               (if Real.== (y, y')
+                               (if Real.< (Real.abs (y - y'), epsilon)
                                 then REL (HORIZONTAL_TO (x'-x))
-                                else if Real.== (x, x')
+                                else if Real.< (Real.abs (x - x'), epsilon)
                                 then REL (VERTICAL_TO (y'-y))
                                 else case pick' (x', y') (x'-x, y'-y) of
                                          ABS (x, y) => elt
