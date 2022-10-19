@@ -365,10 +365,11 @@ functor SvgSerialiserFn (S : sig
                                                       " y2=", QR (#2 target)]
               | POLYLINE cc => (w " points="; w Q; seq out writeCoords cc; w Q)
               | POLYGON cc => (w " points="; w Q; seq out writeCoords cc; w Q)
-              | TEXT { origin, rotation, text } => (w SP;
-                                                    writeCoordAttrs out origin;
-                                                    w " rotate=";
-                                                    w (QR rotation))
+              | TEXT { origin, rotation, text } =>
+                if Real.== (rotation, 0.0)
+                then (w SP; writeCoordAttrs out origin)
+                else (w SP; writeCoordAttrs out origin;
+                      w " rotate="; w (QR rotation))
               | GROUP _ => ()
         end
             
